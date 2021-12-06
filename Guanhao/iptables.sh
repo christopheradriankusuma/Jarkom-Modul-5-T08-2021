@@ -1,0 +1,2 @@
+iptables -t nat -A PREROUTING -p tcp -d 192.215.0.11 -m statistic --mode nth --every 2 --packet 0 -j DNAT --to-destination 192.215.0.18:80
+iptables -t nat -A PREROUTING -p tcp -d 192.215.0.11 -m statistic --mode nth --every 1 --packet 0 -j DNAT --to-destination 192.215.0.19:80
