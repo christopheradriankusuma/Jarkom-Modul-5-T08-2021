@@ -44,48 +44,44 @@ Kami dapatkan hasil perhitungan Network ID, Netmask, Broadcast Address dari semu
 
 ## 1. Agar topologi yang kalian buat dapat mengakses keluar, kalian diminta untuk mengkonfigurasi Foosha menggunakan iptables, tetapi Luffy tidak ingin menggunakan MASQUERADE.
 
-### foosha 
-
-konfigurasi foosha
+## pada foosha
 ```
-auto eth0
-iface eth0 inet dhcp
-
-auto eth1
-iface eth1 inet static
-	address 192.215.0.1
-	netmask 255.255.255.252
-	broadcast 192.215.0.3
-
-auto eth2
-iface eth2 inet static
-	address 192.215.0.5
-	netmask 255.255.255.252
-	broadcast 192.215.0.7
+IP=`ip -br a s eth0 | awk '{print $3}' | awk -F '/' '{print $1}'`
+iptables -t nat -A POSTROUTING -s 192.215.0.8/29 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.0.0/30 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.4.0/22 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.0.128/25 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.0.4/30 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.2.0/23 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.1.0/24 -j SNAT --to-source $IP
+iptables -t nat -A POSTROUTING -s 192.215.0.16/29 -j SNAT --to-source $IP
 ```
+
+pertama-tama mengatur tabel NAT untuk postrouting, lalu menentukan asal subnetnya. source IP nya foosha di eth0.
+
+![image](images/1_1.png)
+lalu dilakukan ping 
 
 
 ## 2. Kalian diminta untuk mendrop semua akses HTTP dari luar Topologi kalian pada server yang merupakan DHCP Server dan DNS Server demi menjaga keamanan.
 
 pada foosha
 ```
-iptables -A FORWARD -d 192.215.0.16/29 -i eth0 -p tcp -m tcp --dport 80 -j DROP
+iptables -A FORWARD -p tcp --dport 80 -j DROP ! -s 192.215.0.0/21 -d 192.215.0.8/29
 ```
+![image](images/2_1.png)
 
-Menggunakan -A FORWARD FORWARD chain untuk menyaring paket dengan -p tcp -m tcp protokol TCP dari luar topologi menuju ke DHCP Server JIPANGU dan DNS Server DORIKI dengan menggunakan subnet yang sama, dimana akses HTTP (yang memiliki --dport 80 port 80) yang masuk ke DHCP Server JIPANGU dan DNS Server DORIKI melalui -i eth0 interfaces eth0 dari DHCP Server JIPANGU dan DNS Server DORIKI agar -j DROP di DROP
+DHCP dan DNS Server terdapat pada IP 192.215.0.8/29. Sehingga destinasinya ke -d 192.215.0.8/29 namun sumbernya bukan dari total subnet kita, melainkan 192.215.0.0/21. Dimana nantinya akan di DROP, karena itu httpnya, berarti detinasi portnya 80 dan protokolnya DHCP
 
 ## 3. Karena kelompok kalian maksimal terdiri dari 3 orang. Luffy meminta kalian untuk membatasi DHCP dan DNS Server hanya boleh menerima maksimal 3 koneksi ICMP secara bersamaan menggunakan iptables, selebihnya didrop.
 
-pada jipangu 
+membuat iptables di water7
 ```
-iptables -A INPUT -p icmp -m connlimit --connlimit-above 3 --connlimit-mask 0 -j DROP
+iptables -A FORWARD -p icmp -j DROP -d 192.215.0.11 -m connlimit --connlimit-above 3 --connlimit-mask 0
 ```
-pada doriki
-```
-iptables -A INPUT -p icmp -m connlimit --connlimit-above 3 --connlimit-mask 0 -j DROP
-```
+![image](images/3_1.png)
 
-menggunakan -A INPUT INPUT chain untuk menyaring paket dengan -p icmp agar protokol ICMP atau ping yang masuk agar dibatasi -m connlimit --connlimit-above 3 hanya sebatas maksimal 3 koneksi saja --connlimit-mask 0 darimana saja, sehingga lebih dari itu akan -j DROP di DROP
+menggunakan -p icmp agar protokol ICMP atau ping yang masuk agar dibatasi -m connlimit --connlimit-above 3 hanya sebatas maksimal 3 koneksi saja --connlimit-mask 0 darimana saja, sehingga lebih dari itu akan -j DROP di DROP.
 
 ## 4. Akses dari subnet Blueno dan Cipher hanya diperbolehkan pada pukul 07.00 - 15.00 pada hari Senin sampai Kamis.[membatasi akses ke Doriki]
 
